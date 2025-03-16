@@ -980,7 +980,6 @@ class ReadmeGeneratorFromCategory(Component):
     """
     category_info: InArg[list]
     readme_template: InArg[str]
-    screenshot_links: InArg[list]
     new_readme: OutArg[str]
 
     def execute(self, ctx) -> None:
@@ -992,26 +991,30 @@ class ReadmeGeneratorFromCategory(Component):
 
         cat_info = self.category_info.value
         template = self.readme_template.value
-        screenshot_links = self.screenshot_links.value
 
         prompt = (
             "You are a documentation generator. Generate a new README in Markdown format for a component library "
             "using the following details. The README must follow the style and structure of the provided template. "
             "It should be concise, clear, and natural, without unnecessary filler or signs of AI generation.\n\n"
+            
             "Template (Markdown):\n"
             f"{template}\n\n"
-            "Category Information (components library details):\n"
-            f"{json.dumps(cat_info, indent=2)}\n\n"
-            "Screenshot Links for the first two components:\n"
-            f"{json.dumps(screenshot_links, indent=2)}\n\n"
+            
+            "Category Information (Complete List of Components in the Library):\n"
+            f"{json.dumps(cat_info)}\n\n"
+            
             "Using the above information, generate a new README in Markdown format that summarizes the key features "
-            "of the library, describes its main components, and includes the provided screenshot links as visual references."
-            "When saving the text, do not enclose it within Markdown formatting indicators like:```markdown text```"
+            "of the library and provides **detailed descriptions for all components** included in the category."
+            "Ensure that each component is clearly documented, following the structure provided in the template."
+            "When saving the text, do not enclose it within Markdown formatting indicators like: ```markdown text```."
+            
             "Additionally, you **must strictly adhere** to the given template, maintaining its exact **structure, paragraph organization, and formatting**."
             "Do not alter the writing style or add any unnecessary content."
 
-            "**IMPORTANT:** After generating the README, you **must always save the file** immediately to ensure no data is lost."
+            "**IMPORTANT:** The README must describe **all components**, not just the first two."
+            "After generating the README, you **must always save the file** immediately to ensure no data is lost."
         )
+
 
         print("Constructed GPT prompt:")
         print(prompt)
