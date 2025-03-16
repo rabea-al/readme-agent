@@ -34,7 +34,15 @@ pip install -r requirements.txt
 1. **Configure the Secret URL:**  
    Provide the secret Xircuits URL (e.g., `http://localhost:8888/lab?token=YOUR_SECRET_TOKEN`) and the target component library (category) name as inputs.
 
-2. **Start the Agent:**  
+2. **Specify the README Template Source:**  
+   - You can provide **a single URL** or **a list of URLs** pointing to raw README templates from GitHub.  
+   - The agent will fetch and merge all templates before generating the final README.
+
+3. **Set the Prompt (Optional):**  
+   - You can provide a **custom prompt** to guide the README generation process.  
+   - If no prompt is provided, the agent will use its **default prompt**, which ensures the generated README follows the structure of the fetched template.
+
+4. **Start the Agent:**    
    Run the agent using:
    ```bash
    python readme_agent.py
@@ -63,5 +71,4 @@ pip install -r requirements.txt
 5. Generates a new README using the extracted data.
 6. Uploads the `README.md` to GitHub.
 7. Inserts the screenshots in their appropriate sections within the README file.
-
 

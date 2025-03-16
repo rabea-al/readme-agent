@@ -7,6 +7,7 @@ import requests
 import os
 from openai import OpenAI
 from dotenv import load_dotenv
+import time
 
 load_dotenv()
 class PlaywrightWorker:
@@ -908,26 +909,7 @@ class PlaywrightDynamicElementHandle(Component):
 
 @xai_component()
 class ExtractCategoryData(Component):
-    """
-    Component to extract category details from a JSON string.
-
-    Expected JSON format:
-    {
-        "category_info": [ { ... }, { ... }, ... ],
-        "readme_template": "A string containing the README template (Markdown format) or a URL to the template.",
-        "screenshot_links": ["link1", "link2", ...]
-    }
-
-    ##### inPorts:
-    - input_json: JSON string containing the category details.
-
-    ##### outPorts:
-    - category_info: A JSON object (typically a list) representing the details of the entire category.
-    - readme_template: A string representing the README template.
-    - screenshot_links: A list of strings representing the screenshot links.
-    """
     input_json: InArg[str]
-
     category_info: OutArg[list]
     readme_template: OutArg[str]
     screenshot_links: OutArg[list]
@@ -941,37 +923,60 @@ class ExtractCategoryData(Component):
         print(f"Category Info: {self.category_info.value}")
         print(f"README Template: {self.readme_template.value}")
         print(f"Screenshot Links: {self.screenshot_links.value}")
-
 @xai_component()
 class GitHubReadmeFetcher(Component):
     """
-    Component to fetch a README template from a GitHub raw URL.
+    Component to fetch README templates from multiple GitHub raw URLs with retry logic.
 
-    This tool reads a README file from the given GitHub raw URL and returns its content as a string.
+    This tool reads README files from the given GitHub raw URLs and returns their combined content as a string.
+    If a request fails, it retries up to 3 times before skipping the URL.
 
     ##### inPorts:
-    - url: a string representing the GitHub raw URL for the README file.
+    - urls: a list of strings representing the GitHub raw URLs for the README files.
 
     ##### outPorts:
-    - readme_content: a string containing the content of the README file.
+    - readme_content: a string containing the combined content of all successfully fetched README files.
     """
-    url: InArg[str]
+    urls: InArg[list]
     readme_content: OutArg[str]
 
     def execute(self, ctx) -> None:
-        url_value = self.url.value
-        response = requests.get(url_value)
-        if response.status_code == 200:
-            self.readme_content.value = response.text
-            print(f"Fetched README content from: {url_value}")
-        else:
-            raise ValueError(f"Failed to fetch README content, status code: {response.status_code}")
+        urls_list = self.urls.value
+        if not urls_list or not isinstance(urls_list, list):
+            raise ValueError("The 'urls' input must be a list of valid GitHub raw URLs.")
+
+        combined_content = []
+        max_retries = 3
+        retry_delay = 2  
+
+        for url in urls_list:
+            for attempt in range(1, max_retries + 1):
+                try:
+                    response = requests.get(url)
+                    if response.status_code == 200:
+                        combined_content.append(response.text)
+                        print(f"Successfully fetched README from: {url}")
+                        break 
+                    else:
+                        print(f"Attempt {attempt}/{max_retries} failed: {url}, Status Code: {response.status_code}")
+                except requests.RequestException as e:
+                    print(f"Attempt {attempt}/{max_retries} encountered an error for {url}: {e}")
+
+                if attempt < max_retries:
+                    print(f"Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay) 
+                else:
+                    print(f"Failed to fetch README after {max_retries} attempts: {url}")
+
+        self.readme_content.value = "\n\n---\n\n".join(combined_content)
+        print("Completed fetching and combining README content.")
+
 
 @xai_component()
 class ReadmeGeneratorFromCategory(Component):
     """
     Generates a new README for a component category in Markdown format using category information,
-    a README template, and screenshot links for the first two components.
+    a README template, and a user-defined prompt.
 
     It outputs:
     - new_readme: a string containing the newly generated README content in Markdown format.
@@ -980,6 +985,7 @@ class ReadmeGeneratorFromCategory(Component):
     """
     category_info: InArg[list]
     readme_template: InArg[str]
+    prompt_template: InArg[str]  
     new_readme: OutArg[str]
 
     def execute(self, ctx) -> None:
@@ -991,38 +997,38 @@ class ReadmeGeneratorFromCategory(Component):
 
         cat_info = self.category_info.value
         template = self.readme_template.value
+        user_prompt = self.prompt_template.value
 
-        prompt = (
-            "You are a documentation generator. Generate a new README in Markdown format for a component library "
-            "using the following details. The README must follow the style and structure of the provided template. "
-            "It should be concise, clear, and natural, without unnecessary filler or signs of AI generation.\n\n"
-            
-            "Template (Markdown):\n"
-            f"{template}\n\n"
-            
-            "Category Information (Complete List of Components in the Library):\n"
-            f"{json.dumps(cat_info)}\n\n"
-            
-            "Using the above information, generate a new README in Markdown format that summarizes the key features "
-            "of the library and provides **detailed descriptions for all components** included in the category."
-            "Ensure that each component is clearly documented, following the structure provided in the template."
-            "When saving the text, do not enclose it within Markdown formatting indicators like: ```markdown text```."
-            
-            "Additionally, you **must strictly adhere** to the given template, maintaining its exact **structure, paragraph organization, and formatting**."
-            "Do not alter the writing style or add any unnecessary content."
+        if not user_prompt:
+            user_prompt = (
+                "You are a documentation generator. Generate a new README in Markdown format for a component library "
+                "using the following details. The README must follow the style and structure of the provided template. "
+                "It should be concise, clear, and natural, without unnecessary filler or signs of AI generation.\n\n"
+                
+                "Template (Markdown):\n"
+                f"{template}\n\n"
+                
+                "Category Information (Complete List of Components in the Library):\n"
+                f"{json.dumps(cat_info)}\n\n"
+                
+                "Using the above information, generate a new README in Markdown format that summarizes the key features "
+                "of the library and provides **detailed descriptions for all components** included in the category."
+                "Ensure that each component is clearly documented, following the structure provided in the template."
+                "When saving the text, do not enclose it within Markdown formatting indicators like: ```markdown text```."
+                
+                "Additionally, you **must strictly adhere** to the given template, maintaining its exact **structure, paragraph organization, and formatting**."
+                "Do not alter the writing style or add any unnecessary content."
 
-            "**IMPORTANT:** The README must describe **all components**, not just the first two."
-            "After generating the README, you **must always save the file** immediately to ensure no data is lost."
-        )
-
+                "**IMPORTANT:** The README must describe **all components**, not just the first two."
+                "After generating the README, you **must always save the file** immediately to ensure no data is lost."
+            )
 
         print("Constructed GPT prompt:")
-        print(prompt)
+        print(user_prompt)
 
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         response = client.chat.completions.create(
             model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "user", "content": user_prompt}],
             max_tokens=1500,
             temperature=0.5,
         )
@@ -1037,42 +1043,6 @@ class ReadmeGeneratorFromCategory(Component):
         with open("README.md", "w", encoding="utf-8") as f:
             f.write(generated_readme)
         print("README.md file saved.")
-
-@xai_component()
-class ExtractCategoryData(Component):
-    """
-    Component to extract category details from a JSON string.
-
-    Expected JSON format:
-    {
-        "category_info": [ { ... }, { ... }, ... ],
-        "readme_template": "A string containing the README template or a URL to the template.",
-        "screenshot_links": ["link1", "link2", ...]
-    }
-
-    ##### inPorts:
-    - input_json: JSON string containing the category details.
-
-    ##### outPorts:
-    - category_info: A list representing the details of the entire category.
-    - readme_template: A string representing the README template.
-    - screenshot_links: A list representing the screenshot links.
-    """
-    input_json: InArg[str]
-
-    category_info: OutArg[list]
-    readme_template: OutArg[str]
-    screenshot_links: OutArg[list]
-
-    def execute(self, ctx) -> None:
-        input_data = json.loads(self.input_json.value)
-        self.category_info.value = input_data.get("category_info", [])
-        self.readme_template.value = str(input_data.get("readme_template", ""))
-        self.screenshot_links.value = input_data.get("screenshot_links", [])
-
-        print(f"Category Info: {self.category_info.value}")
-        print(f"README Template: {self.readme_template.value}")
-        print(f"Screenshot Links: {self.screenshot_links.value}")
 
 @xai_component
 class PlaywrightExtractCategoryInfo(Component):
@@ -1162,24 +1132,7 @@ class ExtractCategoryDetails(Component):
 
 @xai_component()
 class ExtractComponentPaths(Component):
-    """
-    Component to extract URL and file path details from a JSON string.
-
-    Expected JSON format:
-    {
-        "url": "http://example.com/api/endpoint",
-        "file_path": "path/to/component/file.py"
-    }
-
-    ##### inPorts:
-    - input_json: JSON string containing the URL and file path details.
-
-    ##### outPorts:
-    - url: A string representing the URL extracted from the JSON.
-    - file_path: A string representing the file path extracted from the JSON.
-    """
     input_json: InArg[str]
-
     url: OutArg[str]
     file_path: OutArg[str]
 
@@ -1190,3 +1143,21 @@ class ExtractComponentPaths(Component):
 
         print(f"URL: {self.url.value}")
         print(f"File Path: {self.file_path.value}")
+
+@xai_component()
+class ExtractCategoryData(Component):
+
+    input_json: InArg[str]
+    category_info: OutArg[list]
+    readme_template: OutArg[str]
+    screenshot_links: OutArg[list]
+
+    def execute(self, ctx) -> None:
+        input_data = json.loads(self.input_json.value)
+        self.category_info.value = input_data.get("category_info", [])
+        self.readme_template.value = str(input_data.get("readme_template", ""))
+        self.screenshot_links.value = input_data.get("screenshot_links", [])
+
+        print(f"Category Info: {self.category_info.value}")
+        print(f"README Template: {self.readme_template.value}")
+        print(f"Screenshot Links: {self.screenshot_links.value}")
