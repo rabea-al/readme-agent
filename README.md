@@ -4,7 +4,7 @@
 
 The **Xircuits README Agent** is an automated tool designed to generate a complete, professional README file for any Xircuits component library. The agent combines several tools to:
   
-1. Extract detailed category information 
+1. Extract detailed category (component library) information 
 2. Retrieve information and capture screenshots for components 
 3. Fetch a README template from a GitHub raw URL.
 4. Use an OpenAI GPT-powered generator to create a new README in Markdown format that follows the style of the fetched template—concise, clear, and natural.
@@ -32,7 +32,7 @@ pip install -r requirements.txt
 ## How to Run the Agent
 
 1. **Configure the Secret URL:**  
-   Provide the secret Xircuits URL (e.g., `http://localhost:8888/lab?token=YOUR_SECRET_TOKEN`) and the target library (category) name as inputs.
+   Provide the secret Xircuits URL (e.g., `http://localhost:8888/lab?token=YOUR_SECRET_TOKEN`) and the target component library (category) name as inputs.
 
 2. **Start the Agent:**  
    Run the agent using:
@@ -41,11 +41,11 @@ pip install -r requirements.txt
    ```
    The agent will perform the following steps automatically:
    - Open a Playwright browser and navigate to the secret URL.
-   - Use the **extract_category_info** tool to extract complete information about the target category.
-   - Use the **extract_component_info** tool to retrieve details for the first and second components in the category.
+   - Use the **extract_category_info** tool to extract complete information about the target category (component library).
+   - Use the **extract_component_info** tool to retrieve details for the first and second components in the category (component library).
    - Use the **take_screenshot** tool to capture screenshots for these components and save them as `<ComponentName>.png`.
    - Use the **readme_fetcher** tool to fetch a README template from a specified GitHub raw URL.
-   - Use the **readme_generator_from_category** tool (powered by GPT) to generate a new README based on the extracted category details, template, and screenshot links.
+   - Use the **readme_generator_from_category** tool (powered by GPT) to generate a new README based on the extracted category (component library) details, template, and screenshot links.
    - Finally, the new README is saved as `README.md` in the agent's working directory.
 
 
@@ -56,7 +56,7 @@ pip install -r requirements.txt
 > `http://localhost:8888/lab?token=YOUR_SECRET_TOKEN`
 
 **Agent Process:**  
-1. Extracts category information for "SENDGRID".
+1. Extracts category (component library) information for "SENDGRID".
 2. Retrieves details for the first component (`SendGridSendEmail`) and captures its screenshot.
 3. Retrieves details for the second component (`SendgridParseExtractEmail`) and captures its screenshot.
 4. Fetches the README template from a GitHub raw URL.
