@@ -1010,16 +1010,17 @@ class ReadmeGeneratorFromCategory(Component):
                 
                 "Category Information (Complete List of Components in the Library):\n"
                 f"{json.dumps(cat_info)}\n\n"
-                
+                "For each component in the provided list, create a distinct section in the 'Main Components Library' area, ensuring that the number of sections equals the number of components."
                 "Using the above information, generate a new README in Markdown format that summarizes the key features "
-                "of the library and provides **detailed descriptions for all components** included in the category."
+                "of the library."
                 "Ensure that each component is clearly documented, following the structure provided in the template."
                 "When saving the text, do not enclose it within Markdown formatting indicators like: ```markdown text```."
-                
+                "In the Main Components Library section, you should have the same number of components as in the category."
                 "Additionally, you **must strictly adhere** to the given template, maintaining its exact **structure, paragraph organization, and formatting**."
                 "Do not alter the writing style or add any unnecessary content."
+                "Do not add any link in 'Main Components Library' area for any screenshot"
 
-                "**IMPORTANT:** The README must describe **all components**, not just the first two."
+                
                 "After generating the README, you **must always save the file** immediately to ensure no data is lost."
             )
 
@@ -1029,7 +1030,7 @@ class ReadmeGeneratorFromCategory(Component):
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": user_prompt}],
-            max_tokens=1500,
+            max_tokens=2500,
             temperature=0.5,
         )
 
@@ -1158,6 +1159,42 @@ class ExtractCategoryData(Component):
         self.readme_template.value = str(input_data.get("readme_template", ""))
         self.screenshot_links.value = input_data.get("screenshot_links", [])
 
-        print(f"Category Info: {self.category_info.value}")
-        print(f"README Template: {self.readme_template.value}")
-        print(f"Screenshot Links: {self.screenshot_links.value}")
+        print("Input Data:", json.dumps(input_data, indent=2))
+
+@xai_component
+class PlaywrightExecuteJS(Component):
+    """
+    Executes a JavaScript script on the specified page or element.
+
+    ##### inPorts:
+    - page: Playwright Page instance.
+    - locator (optional): The locator of the target element (if applicable).
+    - js_script: JavaScript function as a string to execute.
+                Example: `"document.body.style.backgroundColor = 'red';"`
+
+    ##### outPorts:
+    - out_page: The Playwright Page instance.
+    """
+    page: InArg[Page]
+    locator: InArg[any]
+    js_script: InArg[str]
+    out_page: OutArg[Page]
+
+    def execute(self, ctx) -> None:
+        global global_worker
+        page_obj = self.page.value if self.page.value is not None else ctx.get("page")
+        script = self.js_script.value
+        target_locator = self.locator.value if self.locator.value is not None else None
+
+        if not page_obj:
+            raise ValueError("Missing Playwright page instance.")
+        if not script:
+            raise ValueError("Missing JavaScript script input.")
+
+        if target_locator:
+            global_worker.run(lambda p: target_locator.evaluate(script), page_obj)
+        else:
+            global_worker.run(lambda p: p.evaluate(script), page_obj)
+
+        self.out_page.value = page_obj
+        print(f"Executed JavaScript: {script}")
